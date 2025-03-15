@@ -59,7 +59,7 @@ void array_fill(scalar_t *start, scalar_t *stop, scalar_t value) {
 
 
 template <typename scalar_t>
-__device__ __forceinline__
+__device__
 int augmenting_path_cuda(int nr, int nc, int i,
                          scalar_t *cost, scalar_t *u, scalar_t *v,
                          int *path, int *row4col,
@@ -122,7 +122,7 @@ int augmenting_path_cuda(int nr, int nc, int i,
 
 
 template <typename scalar_t>
-__device__ __forceinline__
+__device__
 void solve_cuda_kernel(int nr, int nc,
                        scalar_t *cost,
                        scalar_t *u, scalar_t *v,
