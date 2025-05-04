@@ -12,6 +12,11 @@ std::vector<torch::Tensor> batch_linear_assignment(torch::Tensor cost) {
   return batch_linear_assignment_cuda(cost);
 }
 
+std::vector<torch::Tensor> solve_half(torch::Tensor cost) {
+  CHECK_INPUT(cost);
+  return solve_half(cost);
+}
+
 bool has_cuda() {
   return true;
 }
@@ -19,4 +24,5 @@ bool has_cuda() {
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("has_cuda", &has_cuda, "CUDA build flag.");
   m.def("batch_linear_assignment", &batch_linear_assignment, "Batch linear assignment (CUDA).");
+  m.def("solve_half", &solve_half, "Batch Lin. Assign. F16");
 }
