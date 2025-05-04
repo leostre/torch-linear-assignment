@@ -91,16 +91,19 @@ __device__
                           uint8_t *SR, uint8_t *SC,
                           int *remaining,
                           scalar_t *p_minVal,
-                          scalar_t infinity, 
-                        int limit)
+                          scalar_t infinity,
+                          int limit
+                        )
  {
      scalar_t minVal = 0;
-     int num_remaining = min(nc, limit
+     int num_remaining = min(nc, 
+      limit
       // prune_costs(nr, nc, cost)
     );
-     for (int it = 0; it < nc; ++it) {
+
+     for (int it = 0; it < limit; ++it) {
          SC[it] = 0;
-         remaining[it] = nc - it - 1;
+         remaining[it] = limit - it - 1;
          shortestPathCosts[it] = infinity;
      }
  
@@ -162,7 +165,8 @@ __device__
                         uint8_t *SR, uint8_t *SC,
                         int *remaining,
                         scalar_t infinity,
-                        int limit)
+                        int limit
+                        )
  {
    scalar_t minVal;
    for (int curRow = 0; curRow < nr; ++curRow) {
@@ -173,7 +177,8 @@ __device__
                                       SR, SC,
                                       remaining,
                                       &minVal, infinity,
-                                    limit);
+                                      limit
+                                    );
  
     //  CUDA_KERNEL_ASSERT(sink >= 0 && "Infeasible matrix");
  
@@ -184,7 +189,7 @@ __device__
        }
      }
  
-     for (int j = 0; j < nc; j++) {
+     for (int j = 0; j < limit; j++) {
        if (SC[j]) {
          v[j] -= minVal - shortestPathCosts[j];
        }
@@ -201,7 +206,7 @@ __device__
     //    col4row[i] = swap;
     //  }
     //  int swap;
-    int max_iterations = nc;  // Prevent infinite loops
+    int max_iterations = limit;  // Prevent infinite loops
     int iterations = 0;
 
     while (i != curRow && iterations++ < max_iterations) {
@@ -227,7 +232,8 @@ __device__
                               uint8_t *SR, uint8_t *SC,
                               int *remaining,
                               scalar_t infinity,
-                            int *limits) {
+                              int *limits
+                            ) {
    int i = blockDim.x * blockIdx.x + threadIdx.x;
    if (i >= bs) {
      return;
@@ -246,7 +252,8 @@ __device__
                      SC + i * nc,
                      remaining + i * nc,
                      infinity,
-                    limit);
+                     limit
+                    );
  }
  
 template <typename scalar_t>
@@ -320,8 +327,9 @@ __global__
      SR.data<uint8_t>(),
      SC.data<uint8_t>(),
      remaining.data<int>(),
-     infinity, 
-     limits.data<int>());
+     infinity,
+     limits.data<int>()
+    );
    cudaError_t err = cudaGetLastError();
    if (err != cudaSuccess) {
      TORCH_CHECK(false, cudaGetErrorString(err));
