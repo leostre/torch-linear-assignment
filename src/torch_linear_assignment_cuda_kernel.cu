@@ -179,9 +179,7 @@ __device__
                                       &minVal, infinity,
                                       limit
                                     );
- 
-    //  CUDA_KERNEL_ASSERT(sink >= 0 && "Infeasible matrix");
- 
+  
      u[curRow] += minVal;
      for (int i = 0; i < nr; i++) {
        if (SR[i] && i != curRow) {
@@ -198,14 +196,7 @@ __device__
      int i = -1;
      int j = sink;
      int swap;
-    //  while (i != curRow) {
-    //    i = path[j];
-    //    row4col[j] = i;
-    //    swap = j;
-    //    j = col4row[i];
-    //    col4row[i] = swap;
-    //  }
-    //  int swap;
+
     int max_iterations = limit;  // Prevent infinite loops
     int iterations = 0;
 
@@ -312,7 +303,7 @@ __global__
    static const int blockSize = SMPCores(device_index);
    int gridSize = (bs + blockSize - 1) / blockSize;
    at::cuda::CUDAStream stream = at::cuda::getCurrentCUDAStream(device_index);
-   torch::Tensor limits = torch::empty({bs}, int_opt);
+   torch::Tensor limits = torch::ones({bs}, int_opt) * nc;
    getLimits<<<gridSize, blockSize, 0, stream.stream()>>>(bs, nr, nc,
     cost, limits.data<int>()
    );
