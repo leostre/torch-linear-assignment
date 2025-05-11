@@ -1,10 +1,5 @@
-EXP_NAME = 'float16+parcrop'
-
+from utils import get_current_git_branch 
 import os
-
-os.environ['CUDA_LAUNCH_BLOCKING'] = '0'
-os.environ['TORCH_USE_CUDA_DSA'] = '1'
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 from time import time
 from itertools import product
@@ -16,6 +11,12 @@ import pandas as pd
 from tqdm import tqdm
 
 from torch_linear_assignment import batch_linear_assignment
+
+os.environ['CUDA_LAUNCH_BLOCKING'] = '0'
+os.environ['TORCH_USE_CUDA_DSA'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+
+EXP_NAME = get_current_git_branch()
 
 is_cuda = torch.cuda.is_available()
 assert is_cuda, 'Requires CUDA!'
