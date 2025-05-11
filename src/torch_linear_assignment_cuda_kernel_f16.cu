@@ -13,11 +13,42 @@
 
 #include <torch/extension.h>
 #include <ATen/cuda/CUDAContext.h>
+#include <c10/util/Half.h> 
 
 typedef unsigned char uint8_t;
 
 // Optimized for modern GPUs (Ampere+)
-constexpr int BLOCK_SIZE = 256;  // Better for half-precision operations
+// constexpr int BLOCK_SIZE = 256;  // Better for half-precision operations
+
+int SMPCoresf16(int device_index)
+  {
+    cudaDeviceProp devProp;
+    cudaGetDeviceProperties(&devProp, device_index);
+    switch (devProp.major){
+    case 2: // Fermi
+      if (devProp.minor == 1)
+        return 48;
+      else return 32;
+    case 3: // Kepler
+      return 192;
+    case 5: // Maxwell
+      return 128;
+    case 6: // Pascal
+      if ((devProp.minor == 1) || (devProp.minor == 2)) return 128;
+      else if (devProp.minor == 0) return 64;
+    case 7: // Volta and Turing
+      if ((devProp.minor == 0) || (devProp.minor == 5)) return 64;
+    case 8: // Ampere
+      if (devProp.minor == 0) return 64;
+      else if (devProp.minor == 6) return 128;
+      else if (devProp.minor == 9) return 128; // ada lovelace
+    case 9: // Hopper
+      if (devProp.minor == 0) return 128;
+    // Unknown device;
+    }
+    return 128;
+  }
+
 
 template <typename uint8_t>
 __device__ __forceinline__
@@ -55,6 +86,8 @@ int augmenting_path_half(int nr, int nc, int i,
                         __half* p_minVal,
                         __half infinity,
                         int limit) {
+
+
     __half minVal = __float2half(0.0f);
     int num_remaining = min(nc, limit);
 
@@ -92,7 +125,7 @@ int augmenting_path_half(int nr, int nc, int i,
         }
 
         minVal = lowest;
-        if (__hisinf(minVal)) {
+        if (__heq(minVal, infinity)) { // maybe __heq
             return -1;
         }
 
@@ -108,12 +141,14 @@ int augmenting_path_half(int nr, int nc, int i,
         SC[j] = 1;
         remaining[index] = remaining[--num_remaining];
     }
+    // printf("[Thread %d,%d] Input: i=%d, limit=%d, nc=%d, nr=%d, sink=%d",
+        // threadIdx.x, blockIdx.x, i, limit, nc, nr, sink);
     *p_minVal = minVal;
     return sink;
 }
 
-__global__
-void solve_kernel_half(int bs, int nr, int nc,
+__device__ __forceinline__
+void solve_kernel_half(int bs, int nr, int nc, // analogue of solve_cuda_kernel
                       __half* cost,
                       __half* u, __half* v,
                       __half* shortestPathCosts,
@@ -121,61 +156,95 @@ void solve_kernel_half(int bs, int nr, int nc,
                       uint8_t* SR, uint8_t* SC,
                       int* remaining,
                       __half infinity,
-                      int* limits) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i >= bs) return;
-
-    int limit = limits[i];
-    __half minVal;
-    
+                      int limit) {
+    __half minVal;    
     for (int curRow = 0; curRow < nr; ++curRow) {
         int sink = augmenting_path_half(nr, nc, curRow, 
-                                      cost + i * nr * nc,
-                                      u + i * nr,
-                                      v + i * nc,
-                                      path + i * nc,
-                                      row4col + i * nc,
-                                      shortestPathCosts + i * nc,
-                                      SR + i * nr,
-                                      SC + i * nc,
-                                      remaining + i * nc,
+                                      cost,
+                                      u,
+                                      v,
+                                      path,
+                                      row4col,
+                                      shortestPathCosts,
+                                      SR,
+                                      SC,
+                                      remaining,
                                       &minVal,
                                       infinity,
                                       limit);
 
-        if (sink < 0) continue;
 
-        u[i * nr + curRow] = __hadd(u[i * nr + curRow], minVal);
+    u[curRow] = __hadd(u[curRow], minVal);
         
-        for (int r = 0; r < nr; r++) {
-            if (SR[i * nr + r] && r != curRow) {
-                __half update = __hsub(minVal, shortestPathCosts[i * nc + col4row[i * nr + r]]);
-                u[i * nr + r] = __hadd(u[i * nr + r], update);
+    for (int i = 0; i < nr; i++) {
+            if (SR[i] && i != curRow) {
+                __half update = __hsub(minVal, shortestPathCosts[col4row[i]]);
+                u[i] = __hadd(u[i], update);
             }
         }
 
-        for (int c = 0; c < limit; c++) {
-            if (SC[i * nc + c]) {
-                __half update = __hsub(minVal, shortestPathCosts[i * nc + c]);
-                v[i * nc + c] = __hsub(v[i * nc + c], update);
+        for (int j = 0; j < limit; j++) {
+            if (SC[j]) {
+                __half update = __hsub(minVal, shortestPathCosts[j]);
+                v[j] = __hsub(v[j], update);
             }
         }
-
+        int i = -1;
         int j = sink;
+        int swap;
+        int max_iterations = limit;
         int iterations = 0;
-        while (iterations++ < limit) {
-            int r = path[i * nc + j];
-            if (r == -1) break;
+
+
+    while (i != curRow && iterations++ < max_iterations) {
+            i = path[j];
+            if (i == -1) break;  // Invalid path
             
-            row4col[i * nc + j] = r;
-            int temp = j;
-            j = col4row[i * nr + r];
-            col4row[i * nr + r] = temp;
+            row4col[j] = i;      // Assign column j to row i
+            swap = j;
+            j = col4row[i];      // Get previous column assigned to row i
+            col4row[i] = swap;   // Update row i's assignment to column j
         }
     }
 }
 
-void solve_half_batch(torch::Tensor cost, torch::Tensor col4row, torch::Tensor row4col) {
+// template <typename scalar_t>
+__global__
+void solve_kernel_half_batch(int bs, int nr, int nc,
+                             __half *cost,
+                             __half *u, __half *v,
+                             __half *shortestPathCosts,
+                             int *path, int *col4row, int *row4col,
+                             uint8_t *SR, uint8_t *SC,
+                             int *remaining,
+                             __half infinity,
+                             int *limits
+                           ) {
+  int i = blockDim.x * blockIdx.x + threadIdx.x;
+  if (i >= bs) {
+    return;
+  }
+  int limit = limits[i];
+  solve_kernel_half(bs, nr, nc,
+    cost + i * nr * nc,
+    u + i * nr,
+    v + i * nc,
+    shortestPathCosts + i * nc,
+    path + i * nc,
+    col4row + i * nr,
+    row4col + i * nc,
+    SR + i * nr,
+    SC + i * nc,
+    remaining + i * nc,
+    infinity,
+    limit
+   );
+
+}
+
+void solve_half_batch(torch::Tensor cost, 
+    torch::Tensor col4row, 
+    torch::Tensor row4col) {
     auto sizes = cost.sizes();
     int bs = sizes[0], nr = sizes[1], nc = sizes[2];
     int device_index = cost.device().index();
@@ -214,13 +283,14 @@ void solve_half_batch(torch::Tensor cost, torch::Tensor col4row, torch::Tensor r
     torch::Tensor SC = torch::empty({bs * nc}, byte_options);
 
     // Launch kernel
-    int grid_size = (bs + BLOCK_SIZE - 1) / BLOCK_SIZE;
-    solve_kernel_half<<<grid_size, BLOCK_SIZE, 0, stream.stream()>>>(
+    static const int blockSize = SMPCoresf16(device_index);
+    int grid_size = (bs + blockSize - 1) / blockSize;
+    solve_kernel_half_batch<<<grid_size, blockSize, 0, stream.stream()>>>(
         bs, nr, nc,
-        cost.data_ptr<__half>(),
-        u.data_ptr<__half>(),
-        v.data_ptr<__half>(),
-        shortestPathCosts.data_ptr<__half>(),
+        reinterpret_cast<__half*>(cost.data_ptr<at::Half>()),
+        reinterpret_cast<__half*>(u.data_ptr<at::Half>()),
+        reinterpret_cast<__half*>(v.data_ptr<at::Half>()),
+        reinterpret_cast<__half*>(shortestPathCosts.data_ptr<at::Half>()),
         path.data_ptr<int>(),
         col4row.data_ptr<int>(),
         row4col.data_ptr<int>(),
@@ -238,7 +308,7 @@ void solve_half_batch(torch::Tensor cost, torch::Tensor col4row, torch::Tensor r
     }
 }
  
-std::vector<torch::Tensor> solve_half(torch::Tensor cost) {
+std::vector<torch::Tensor> bla_half(torch::Tensor cost) {
     auto sizes = cost.sizes();  
     auto device = cost.device();
     auto options = torch::TensorOptions()
@@ -251,17 +321,16 @@ std::vector<torch::Tensor> solve_half(torch::Tensor cost) {
     if (sizes[0] * sizes[1] == 0) {
       return {col4row, row4col};
     }
+    solve_half_batch(
+        cost,
+        col4row,
+        row4col);
   
-    AT_DISPATCH_FLOATING_TYPES(cost.scalar_type(), "solve_half_batch", [&] {
-        solve_half_batch<scalar_t>(
-          cost.scalar_type(),
-          device.index(),
-          sizes[0], sizes[1], sizes[2],
-          cost.data<scalar_t>(),
-          col4row.data<int>(),
-          row4col.data<int>());
-    });
+    // AT_DISPATCH_FLOATING_TYPES(__half, "solve_half_batch", [&] {
+        
+    // });
     return {col4row, row4col};
   }
+
 
 

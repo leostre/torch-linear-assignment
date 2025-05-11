@@ -24,14 +24,14 @@ def batch_linear_assignment_cuda(cost):
             col4row, row4col = backend.batch_linear_assignment(cost.contiguous())  # (B, T), (B, W).
             return row4col.long()
         else: 
-            col4row, row4col = backend.solve_half(cost.contiguous())  # (B, T), (B, W).
+            col4row, row4col = backend.batch_linear_assignment_half(cost.contiguous())  # (B, T), (B, W).
             return row4col.long()
     else:
         if cost.dtype is not torch.float16:
             col4row, row4col = backend.batch_linear_assignment(cost.contiguous())  # (B, W), (B, T).
             return col4row.long()
         else: 
-            col4row, row4col = backend.solve_half(cost.contiguous())  # (B, W), (B, T).
+            col4row, row4col = backend.batch_linear_assignment_half(cost.contiguous())  # (B, W), (B, T).
             return col4row.long()
 
 

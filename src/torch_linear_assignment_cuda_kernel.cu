@@ -310,16 +310,16 @@ __global__
    solve_cuda_kernel_batch<<<gridSize, blockSize, 0, stream.stream()>>>(
      bs, nr, nc,
      cost,
-     u.data<scalar_t>(),
-     v.data<scalar_t>(),
-     shortestPathCosts.data<scalar_t>(),
-     path.data<int>(),
+     u.data_ptr<scalar_t>(),
+     v.data_ptr<scalar_t>(),
+     shortestPathCosts.data_ptr<scalar_t>(),
+     path.data_ptr<int>(),
      col4row, row4col,
-     SR.data<uint8_t>(),
+     SR.data_ptr<uint8_t>(),
      SC.data<uint8_t>(),
-     remaining.data<int>(),
+     remaining.data_ptr<int>(),
      infinity,
-     limits.data<int>()
+     limits.data_ptr<int>()
     );
    cudaError_t err = cudaGetLastError();
    if (err != cudaSuccess) {
@@ -350,9 +350,9 @@ __global__
          cost.scalar_type(),
          device.index(),
          sizes[0], sizes[1], sizes[2],
-         cost.data<scalar_t>(),
-         col4row.data<int>(),
-         row4col.data<int>());
+         cost.data_ptr<scalar_t>(),
+         col4row.data_ptr<int>(),
+         row4col.data_ptr<int>());
    });
    return {col4row, row4col};
  }
