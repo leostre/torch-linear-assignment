@@ -67,17 +67,21 @@ __device__
       if (cost[c] != padVal){
         continue; 
       }
-      bool allPad = true;
-      for (int r = 0; r <nr; r++){
-        if (cost[r * nr + c] != padVal){
-          allPad = false;
-          break;
-        }
-      }
-      if (allPad){
-        return c;
-      }
+      // printf("limit=%d", c);
+      return c + 1;
+      // bool allPad = true;
+      // for (int r = 0; r <nr; r++){
+      //   if (cost[r * nr + c] != padVal){
+      //     allPad = false;
+      //     break;
+      //   }
+      // }
+      // if (allPad){
+      //   printf("limit=%d", c);
+      //   return c;
+      // }
     }
+    // printf("unsuc");
     return nc;
  }
  
@@ -97,8 +101,8 @@ __device__
  {
      scalar_t minVal = 0;
      int num_remaining = min(nc, 
-      limit
-      // prune_costs(nr, nc, cost)
+      // limit
+      prune_costs(nr, nc, cost)
     );
 
      for (int it = 0; it < limit; ++it) {
@@ -198,14 +202,7 @@ __device__
      int i = -1;
      int j = sink;
      int swap;
-    //  while (i != curRow) {
-    //    i = path[j];
-    //    row4col[j] = i;
-    //    swap = j;
-    //    j = col4row[i];
-    //    col4row[i] = swap;
-    //  }
-    //  int swap;
+
     int max_iterations = limit;  // Prevent infinite loops
     int iterations = 0;
 
@@ -271,13 +268,16 @@ __global__
     for (int r = 0; r <nr; r++){
         if (cost[r * nr + c] != padVal){
             allPad = false;
+            
             break;
         }
     }
     if (allPad){
+      printf("limit=%d", c);
         out[i] = c;
     }
   }
+  printf("unsuc");
   out[i] = nc;
 } 
  
@@ -313,9 +313,9 @@ __global__
    int gridSize = (bs + blockSize - 1) / blockSize;
    at::cuda::CUDAStream stream = at::cuda::getCurrentCUDAStream(device_index);
    torch::Tensor limits = torch::empty({bs}, int_opt);
-   getLimits<<<gridSize, blockSize, 0, stream.stream()>>>(bs, nr, nc,
-    cost, limits.data<int>()
-   );
+  //  getLimits<<<gridSize, blockSize, 0, stream.stream()>>>(bs, nr, nc,
+  //   cost, limits.data<int>()
+  //  );
    solve_cuda_kernel_batch<<<gridSize, blockSize, 0, stream.stream()>>>(
      bs, nr, nc,
      cost,
