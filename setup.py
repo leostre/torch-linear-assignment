@@ -16,7 +16,7 @@ def get_build_ext_modules():
                 [
                     "src/torch_linear_assignment_cuda.cpp",
                     "src/torch_linear_assignment_cuda_kernel.cu",
-                    "src/torch_linear_assignment_cuda_kernel.cu"
+                    "src/torch_linear_assignment_cuda_kernel_f16.cu"
                 ],
                 extra_compile_args=compile_args
             )
