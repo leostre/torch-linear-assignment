@@ -20,34 +20,34 @@ typedef unsigned char uint8_t;
 // Optimized for modern GPUs (Ampere+)
 // constexpr int BLOCK_SIZE = 256;  // Better for half-precision operations
 
-int SMPCoresf16(int device_index)
-  {
-    cudaDeviceProp devProp;
-    cudaGetDeviceProperties(&devProp, device_index);
-    switch (devProp.major){
-    case 2: // Fermi
-      if (devProp.minor == 1)
-        return 48;
-      else return 32;
-    case 3: // Kepler
-      return 192;
-    case 5: // Maxwell
-      return 128;
-    case 6: // Pascal
-      if ((devProp.minor == 1) || (devProp.minor == 2)) return 128;
-      else if (devProp.minor == 0) return 64;
-    case 7: // Volta and Turing
-      if ((devProp.minor == 0) || (devProp.minor == 5)) return 64;
-    case 8: // Ampere
-      if (devProp.minor == 0) return 64;
-      else if (devProp.minor == 6) return 128;
-      else if (devProp.minor == 9) return 128; // ada lovelace
-    case 9: // Hopper
-      if (devProp.minor == 0) return 128;
-    // Unknown device;
-    }
-    return 128;
-  }
+// int SMPCoresf16(int device_index)
+//   {
+//     cudaDeviceProp devProp;
+//     cudaGetDeviceProperties(&devProp, device_index);
+//     switch (devProp.major){
+//     case 2: // Fermi
+//       if (devProp.minor == 1)
+//         return 48;
+//       else return 32;
+//     case 3: // Kepler
+//       return 192;
+//     case 5: // Maxwell
+//       return 128;
+//     case 6: // Pascal
+//       if ((devProp.minor == 1) || (devProp.minor == 2)) return 128;
+//       else if (devProp.minor == 0) return 64;
+//     case 7: // Volta and Turing
+//       if ((devProp.minor == 0) || (devProp.minor == 5)) return 64;
+//     case 8: // Ampere
+//       if (devProp.minor == 0) return 64;
+//       else if (devProp.minor == 6) return 128;
+//       else if (devProp.minor == 9) return 128; // ada lovelace
+//     case 9: // Hopper
+//       if (devProp.minor == 0) return 128;
+//     // Unknown device;
+//     }
+//     return 128;
+//   }
 
 
 template <typename uint8_t>
@@ -283,7 +283,7 @@ void solve_half_batch(torch::Tensor cost,
     torch::Tensor SC = torch::empty({bs * nc}, byte_options);
 
     // Launch kernel
-    static const int blockSize = SMPCoresf16(device_index);
+    static const int blockSize = 1; //SMPCoresf16(device_index);
     int grid_size = (bs + blockSize - 1) / blockSize;
     solve_kernel_half_batch<<<grid_size, blockSize, 0, stream.stream()>>>(
         bs, nr, nc,
