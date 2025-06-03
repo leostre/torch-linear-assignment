@@ -1,4 +1,4 @@
-from utils import get_current_git_branch
+from utils import get_current_git_branch, set_all_seeds
 
 import os
 from time import time
@@ -19,6 +19,8 @@ assert is_cuda, 'Requires CUDA!'
 os.environ['CUDA_LAUNCH_BLOCKING'] = '0'
 os.environ['TORCH_USE_CUDA_DSA'] = '1'
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+
+set_all_seeds()
 
 EXP_NAME = get_current_git_branch()
 

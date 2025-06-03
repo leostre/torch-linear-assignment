@@ -7,6 +7,38 @@ import numpy as np
 
 from torch_linear_assignment import batch_linear_assignment
 
+import os
+import random
+
+def set_all_seeds(seed=42, multi_gpu=False):
+    """
+    Set the seed for all random number generators to ensure reproducibility.
+    
+    Parameters:
+        seed (int): The seed value to use (default: 42)
+    """
+    # Python built-in random module
+    random.seed(seed)
+    
+    # NumPy
+    np.random.seed(seed)
+    
+    # PyTorch
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    if multi_gpu:
+        torch.cuda.manual_seed_all(seed)  # if using multi-GPU
+    
+    # CuDNN (can impact performance but ensures reproducibility)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    
+    # Set a fixed value for the hash seed
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    
+    print(f"All seeds set to {seed}")
+
+
 def last_commit_hash():
     os.system('git log -n 1 $(git rev-parse --abbrev-ref HEAD) > tmp.txt')
     with open('tmp.txt', 'rt') as file:
