@@ -23,7 +23,10 @@ EXP_NAME = get_current_git_branch()
 is_cuda = torch.cuda.is_available()
 assert is_cuda, 'Requires CUDA!'
 
-TYPES = [torch.float16, torch.float32,]
+TYPES = {
+    'f16': torch.float16, 
+    'f32': torch.float32,
+}
 
 def nr_nc_ratio(nr, nc, factor=1, type=torch.float32):
     bs = 1
@@ -66,7 +69,11 @@ for tp in TYPES:
         times = [] 
         right_rate = []
         for i in range(REPS):
-            rate, t = nr_nc_ratio(nr, nc, factor, type=tp)
+            try:
+                rate, t = nr_nc_ratio(nr, nc, factor, type=TYPES[tp])
+            except:
+                rate = t = -1
+
             times.append(t)
             right_rate.append(rate)
         times = np.array(times)
@@ -79,7 +86,7 @@ for tp in TYPES:
     columns = ['nr', 'nc', 'factor', 'acc_mean', 'acc_std', 'time_mean', 'time_std']
     resdf = pd.DataFrame(data=results, columns=columns)
 
-    resdf.to_csv(f'experiments/results/scale_{EXP_NAME}.csv')
+    resdf.to_csv(f'experiments/results/scale_{EXP_NAME}_{tp}.csv')
 
 
 
@@ -117,7 +124,10 @@ for tp in TYPES:
         times = [] 
         right_rate = []
         for i in range(REPS):
-            rate, t = nr_nc_ratio_shift(nr, nc, shift, type=tp)
+            try:
+                rate, t = nr_nc_ratio_shift(nr, nc, shift, type=TYPES[tp])
+            except:
+                rate = t = -1e-5
             times.append(t)
             right_rate.append(rate)
         times = np.array(times)
