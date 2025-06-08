@@ -277,6 +277,7 @@ __global__
                        int device_index,
                        int bs, int nr, int nc,
                        scalar_t *cost, int *col4row, int *row4col) {
+   printf("FLOAT32");
    cudaSetDevice(device_index);
  
    TORCH_CHECK(std::numeric_limits<scalar_t>::has_infinity, "Data type doesn't have infinity.");
@@ -300,7 +301,7 @@ __global__
    torch::Tensor SC = torch::empty({bs * nc}, uint8_opt);
    torch::Tensor remaining = torch::empty({bs * nc}, int_opt);
  
-   static const int blockSize = 1; //SMPCores(device_index);
+   static const int blockSize = SMPCores(device_index);
    int gridSize = (bs + blockSize - 1) / blockSize;
    at::cuda::CUDAStream stream = at::cuda::getCurrentCUDAStream(device_index);
    torch::Tensor limits = torch::ones({bs}, int_opt) * nc;
@@ -344,8 +345,9 @@ __global__
    if (sizes[0] * sizes[1] == 0) {
      return {col4row, row4col};
    }
+  //  printf(cost.scalar_type().toString());
  
-   AT_DISPATCH_FLOATING_TYPES(cost.scalar_type(), "solve_cuda_batch", [&] {
+   AT_DISPATCH_ALL_TYPES(cost.scalar_type(), "solve_cuda_batch", [&] {
      solve_cuda_batch<scalar_t>(
          cost.scalar_type(),
          device.index(),
