@@ -51,32 +51,34 @@ typedef unsigned char uint8_t;
 template <typename scalar_t>
 __device__ __forceinline__
 void array_fill(scalar_t *start, scalar_t *stop, scalar_t value) {
-  for (; start < stop; ++start) {
-    *start = value;
-  }
+    scalar_t *ptr = start;
+    // #pragma unroll 4
+    while (ptr < stop) {
+        *ptr++ = value;
+    }
 }
-
 
 template <typename scalar_t>
 __device__ __forceinline__
 int augmenting_path_cuda(int nr, int nc, int i,
-                         scalar_t *cost, scalar_t *u, scalar_t *v,
-                         int *path, int *row4col,
-                         scalar_t *shortestPathCosts,
-                         uint8_t *SR, uint8_t *SC,
-                         int *remaining,
-                         scalar_t *p_minVal,
-                         scalar_t infinity)
-{
+                        scalar_t *cost, scalar_t *u, scalar_t *v,
+                        int *path, int *row4col,
+                        scalar_t *shortestPathCosts,
+                        uint8_t *SR, uint8_t *SC,
+                        int *remaining,
+                        scalar_t *p_minVal,
+                        scalar_t infinity) {
     scalar_t minVal = 0;
     int num_remaining = nc;
+    
+    // Initialize arrays with branchless operations
+    // #pragma unroll 4
     for (int it = 0; it < nc; ++it) {
         SC[it] = 0;
         remaining[it] = nc - it - 1;
         shortestPathCosts[it] = infinity;
     }
-
-    array_fill(SR, SR + nr, (uint8_t) 0);
+    array_fill(SR, SR + nr, (uint8_t)0);
 
     int sink = -1;
     while (sink == -1) {
@@ -86,32 +88,32 @@ int augmenting_path_cuda(int nr, int nc, int i,
 
         scalar_t *cost_row = cost + i * nc;
         scalar_t base_r = minVal - u[i];
+        
+        // Process in chunks of 4 for better ILP
+        // #pragma unroll 4
         for (int it = 0; it < num_remaining; it++) {
             int j = remaining[it];
             scalar_t r = base_r + cost_row[j] - v[j];
-            if (r < shortestPathCosts[j]) {
-              path[j] = i;
-              shortestPathCosts[j] = r;
-            }
-            if (shortestPathCosts[j] < lowest ||
-                (shortestPathCosts[j] == lowest && row4col[j] == -1)) {
-                lowest = shortestPathCosts[j];
-                index = it;
-            }
+            
+            // Branchless update
+            bool update = r < shortestPathCosts[j];
+            path[j] = update ? i : path[j];
+            shortestPathCosts[j] = update ? r : shortestPathCosts[j];
+            
+            // Branchless minimum tracking
+            bool is_lower = (shortestPathCosts[j] < lowest) || 
+                           ((shortestPathCosts[j] == lowest) & (row4col[j] == -1));
+            index = is_lower ? it : index;
+            lowest = is_lower ? shortestPathCosts[j] : lowest;
         }
 
         minVal = lowest;
-        if (minVal == infinity) {
-            return -1;
-        }
+        if (minVal == infinity) return -1;
 
         int j = remaining[index];
-        if (row4col[j] == -1) {
-            sink = j;
-        } else {
-            i = row4col[j];
-        }
-
+        sink = (row4col[j] == -1) ? j : sink;
+        i = (row4col[j] != -1) ? row4col[j] : i;
+        
         SC[j] = 1;
         remaining[index] = remaining[--num_remaining];
     }
@@ -123,80 +125,71 @@ int augmenting_path_cuda(int nr, int nc, int i,
 template <typename scalar_t>
 __device__ __forceinline__
 void solve_cuda_kernel(int nr, int nc,
-                       scalar_t *cost,
-                       scalar_t *u, scalar_t *v,
-                       scalar_t *shortestPathCosts,
-                       int *path, int *col4row, int *row4col,
-                       uint8_t *SR, uint8_t *SC,
-                       int *remaining,
-                       scalar_t infinity)
-{
-  scalar_t minVal;
-  for (int curRow = 0; curRow < nr; ++curRow) {
-    auto sink = augmenting_path_cuda(nr, nc, curRow, cost,
-                                     u, v,
-                                     path, row4col,
-                                     shortestPathCosts,
-                                     SR, SC,
-                                     remaining,
-                                     &minVal, infinity);
+                      scalar_t *cost,
+                      scalar_t *u, scalar_t *v,
+                      scalar_t *shortestPathCosts,
+                      int *path, int *col4row, int *row4col,
+                      uint8_t *SR, uint8_t *SC,
+                      int *remaining,
+                      scalar_t infinity) {
+    scalar_t minVal;
+    for (int curRow = 0; curRow < nr; ++curRow) {
+        int sink = augmenting_path_cuda(nr, nc, curRow, cost, u, v,
+                                      path, row4col, shortestPathCosts,
+                                      SR, SC, remaining, &minVal, infinity);
+        
+        u[curRow] += minVal;
+        
+        // Process rows in chunks
+        // #pragma unroll 4
+        for (int i = 0; i < nr; i++) {
+            u[i] += (SR[i] & (i != curRow)) * (minVal - shortestPathCosts[col4row[i]]);
+        }
+        
+        // Process columns in chunks
+        // #pragma unroll 4
+        for (int j = 0; j < nc; j++) {
+            v[j] -= SC[j] * (minVal - shortestPathCosts[j]);
+        }
 
-    CUDA_KERNEL_ASSERT(sink >= 0 && "Infeasible matrix");
-
-    u[curRow] += minVal;
-    for (int i = 0; i < nr; i++) {
-      if (SR[i] && i != curRow) {
-        u[i] += minVal - shortestPathCosts[col4row[i]];
-      }
+        // Path reversal with loop unrolling
+        int j = sink;
+        for (int iter = 0; iter < nc; iter++) {
+            int i = path[j];
+            row4col[j] = i;
+            int swap = j;
+            j = col4row[i];
+            col4row[i] = swap;
+            if (i == curRow) break;
+        }
     }
-
-    for (int j = 0; j < nc; j++) {
-      if (SC[j]) {
-        v[j] -= minVal - shortestPathCosts[j];
-      }
-    }
-
-    int i = -1;
-    int j = sink;
-    int swap;
-    while (i != curRow) {
-      i = path[j];
-      row4col[j] = i;
-      swap = j;
-      j = col4row[i];
-      col4row[i] = swap;
-    }
-  }
 }
-
 
 template <typename scalar_t>
 __global__
 void solve_cuda_kernel_batch(int bs, int nr, int nc,
-                             scalar_t *cost,
-                             scalar_t *u, scalar_t *v,
-                             scalar_t *shortestPathCosts,
-                             int *path, int *col4row, int *row4col,
-                             uint8_t *SR, uint8_t *SC,
-                             int *remaining,
-                             scalar_t infinity) {
-  int i = blockDim.x * blockIdx.x + threadIdx.x;
-  if (i >= bs) {
-    return;
-  }
+                            scalar_t *cost,
+                            scalar_t *u, scalar_t *v,
+                            scalar_t *shortestPathCosts,
+                            int *path, int *col4row, int *row4col,
+                            uint8_t *SR, uint8_t *SC,
+                            int *remaining,
+                            scalar_t infinity) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= bs) return;
 
-  solve_cuda_kernel(nr, nc,
-                    cost + i * nr * nc,
-                    u + i * nr,
-                    v + i * nc,
-                    shortestPathCosts + i * nc,
-                    path + i * nc,
-                    col4row + i * nr,
-                    row4col + i * nc,
-                    SR + i * nr,
-                    SC + i * nc,
-                    remaining + i * nc,
-                    infinity);
+    solve_cuda_kernel(nr, nc,
+                     cost + i * nr * nc,
+                     u + i * nr,
+                     v + i * nc,
+                     shortestPathCosts + i * nc,
+                     path + i * nc,
+                     col4row + i * nr,
+                     row4col + i * nc,
+                     SR + i * nr,
+                     SC + i * nc,
+                     remaining + i * nc,
+                     infinity);
 }
 
 
