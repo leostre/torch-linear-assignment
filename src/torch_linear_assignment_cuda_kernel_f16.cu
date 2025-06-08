@@ -245,7 +245,7 @@ void solve_kernel_half_batch(int bs, int nr, int nc,
 void solve_half_batch(torch::Tensor cost, 
     torch::Tensor col4row, 
     torch::Tensor row4col) {
-    printf("FLOAT16");
+    // printf("FLOAT16");
     auto sizes = cost.sizes();
     int bs = sizes[0], nr = sizes[1], nc = sizes[2];
     int device_index = cost.device().index();
