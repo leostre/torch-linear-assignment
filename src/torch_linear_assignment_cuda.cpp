@@ -10,14 +10,11 @@ std::vector<torch::Tensor> bla_half(torch::Tensor cost);
 
 // Returns col4row and row4col.
 std::vector<torch::Tensor> batch_linear_assignment(torch::Tensor cost) {
-  // printf("from cpp bla");
   CHECK_INPUT(cost);
   return batch_linear_assignment_cuda(cost);
 }
 
 std::vector<torch::Tensor> bla_bf16(torch::Tensor cost) {
-  // printf("from cpp bla_half");
-std::vector<torch::Tensor> batch_linear_assignment_half(torch::Tensor cost) {
   CHECK_INPUT(cost);
   return bla_bfloat16(cost);
 }
