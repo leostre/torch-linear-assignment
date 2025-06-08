@@ -1,4 +1,4 @@
-from utils import get_current_git_branch, set_all_seeds
+from utils import get_current_git_branch
 
 import os
 from time import time
@@ -53,7 +53,7 @@ print('STARTED BS EVALUATION'.center(80, '+'))
 for TYPE in _TYPES:
     results = []
     REPS = 20
-    bss = [4, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16364]
+    bss = [4, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384]
 
     for bs in tqdm(bss):
         times = [] 
