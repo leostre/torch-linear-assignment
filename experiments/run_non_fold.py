@@ -1,4 +1,4 @@
-from utils import get_current_git_branch
+from utils import get_current_git_branch, set_all_seeds
 
 import os
 from time import time
@@ -11,6 +11,8 @@ import pandas as pd
 from tqdm import tqdm
 
 from torch_linear_assignment import batch_linear_assignment
+
+set_all_seeds()
 
 is_cuda = torch.cuda.is_available()
 assert is_cuda, 'Requires CUDA!'
@@ -49,13 +51,14 @@ def nr_nc(bs, type):
 print('STARTED BS EVALUATION'.center(80, '+'))
 for TYPE in _TYPES:
     results = []
-    REPS = 10
-    bss = [4, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16364]
+    REPS = 20
+    bss = (np.array([4, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16364]
+    ) * 0.9)
 
     for bs in tqdm(bss):
         times = [] 
         for i in range(REPS):
-            t = nr_nc(bs, TYPE)
+            t = nr_nc(int(bs), TYPE)
             times.append(t)
         times = np.array(times)
         results.append(
@@ -65,4 +68,5 @@ for TYPE in _TYPES:
     columns = ['bs', 'time_mean', 'time_std']
     resdf = pd.DataFrame(data=results, columns=columns)
 
-    resdf.to_csv(f'experiments/results/bs_{EXP_NAME}_{TYPE}.csv')
+    resdf.to_csv(f'experiments/results/bs_nonfold_{EXP_NAME}_{TYPE}.csv')
+
