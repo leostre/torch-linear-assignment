@@ -1,4 +1,4 @@
-from utils import get_current_git_branch
+from utils import get_current_git_branch, set_all_seeds
 
 import os
 from time import time

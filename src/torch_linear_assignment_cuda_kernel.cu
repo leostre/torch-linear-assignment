@@ -181,7 +181,7 @@ __device__
        }
      }
  
-     for (int j = 0; j < limit; j++) {
+     for (int j = 0; j < nc; j++) {
        if (SC[j]) {
          v[j] -= minVal - shortestPathCosts[j];
        }

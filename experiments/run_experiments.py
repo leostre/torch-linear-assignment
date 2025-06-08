@@ -1,4 +1,4 @@
-from utils import get_current_git_branch 
+from utils import get_current_git_branch, set_all_seeds
 import os
 
 from time import time
@@ -11,6 +11,8 @@ import pandas as pd
 from tqdm import tqdm
 
 from torch_linear_assignment import batch_linear_assignment
+
+set_all_seeds()
 
 os.environ['CUDA_LAUNCH_BLOCKING'] = '0'
 os.environ['TORCH_USE_CUDA_DSA'] = '1'
@@ -70,7 +72,7 @@ for tp in TYPES:
             try:
                 rate, t = nr_nc_ratio(nr, nc, factor, type=TYPES[tp])
             except:
-                rate = t = -1
+                rate = t = -1e-5
 
             times.append(t)
             right_rate.append(rate)
