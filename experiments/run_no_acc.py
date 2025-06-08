@@ -1,4 +1,4 @@
-from utils import get_current_git_branch, set_all_seeds
+from utils import get_current_git_branch
 
 import os
 from time import time
@@ -20,8 +20,6 @@ os.environ['CUDA_LAUNCH_BLOCKING'] = '0'
 os.environ['TORCH_USE_CUDA_DSA'] = '1'
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
-set_all_seeds()
-
 EXP_NAME = get_current_git_branch()
 
 # TYPE = 'f16'
@@ -33,24 +31,26 @@ _TYPES = {
 real_costs = torch.load('/root/torch-linear-assignment/data/train-end.pth')
 
 def nr_nc(bs, type):
-    torch.cuda.synchronize()
     if is_cuda:
         costs = real_costs[:bs].to('cuda').to(_TYPES[type])
     assert costs.dtype == _TYPES[type]
-    t = time()
-    batch_linear_assignment(costs)
-    t = time() - t
-    
-    del costs 
-    torch.cuda.empty_cache()
-
+    try:
+        torch.cuda.synchronize()
+        t = time()
+        batch_linear_assignment(costs)
+        t = time() - t
+    except:
+        return -1e-5
+    finally:
+        del costs 
+        torch.cuda.empty_cache()
     return t
 
 print('STARTED BS EVALUATION'.center(80, '+'))
 for TYPE in _TYPES:
     results = []
     REPS = 10
-    bss = [4, 16, 32, 64, 128, 256, 512, 1024]
+    bss = [4, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16364]
 
     for bs in tqdm(bss):
         times = [] 
