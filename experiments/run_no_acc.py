@@ -1,4 +1,4 @@
-from utils import get_current_git_branch
+from utils import get_current_git_branch, set_all_seeds
 
 import os
 from time import time
@@ -11,6 +11,8 @@ import pandas as pd
 from tqdm import tqdm
 
 from torch_linear_assignment import batch_linear_assignment
+
+set_all_seeds()
 
 is_cuda = torch.cuda.is_available()
 assert is_cuda, 'Requires CUDA!'
