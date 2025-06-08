@@ -15,7 +15,7 @@ def batch_linear_assignment_cpu(cost):
     return matching
 
 
-def batch_linear_assignment_cuda(cost, dtype=None, scale_factor=1):
+def batch_linear_assignment_cuda(cost, dtype=None, scale_factor=1, clamp_factor=.9):
     if dtype is None:
         dtype = cost.dtype
     b, w, t = cost.shape
@@ -24,6 +24,8 @@ def batch_linear_assignment_cuda(cost, dtype=None, scale_factor=1):
         cost = cost.transpose(1, 2)
     if dtype in (torch.float16, torch.bfloat16):
         cost = _whiten_data(cost, scale_factor=scale_factor).to(dtype)
+    maxval = torch.finfo(dtype).max * clamp_factor
+    torch.clamp_(cost, -maxval, maxval)
     if dtype not in (torch.float16, torch.bfloat16):
         result = backend.batch_linear_assignment(cost.contiguous().float())
     elif dtype is torch.bfloat16:
@@ -46,7 +48,7 @@ def _whiten_data(costs, **kws):
     return costs
 
 
-def batch_linear_assignment(cost, dtype=None, factor=1):
+def batch_linear_assignment(cost, dtype=None, factor=1, **kwargs):
     """Solve a batch of linear assignment problems.
 
     The method minimizes the cost.

@@ -19,6 +19,11 @@ std::vector<torch::Tensor> bla_bf16(torch::Tensor cost) {
   return bla_bfloat16(cost);
 }
 
+std::vector<torch::Tensor> batch_linear_assignment_half(torch::Tensor cost) {
+  CHECK_INPUT(cost);
+  return bla_half(cost);
+}
+
 bool has_cuda() {
   return true;
 }
