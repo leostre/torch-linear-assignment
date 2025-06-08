@@ -91,19 +91,15 @@ __device__
                           uint8_t *SR, uint8_t *SC,
                           int *remaining,
                           scalar_t *p_minVal,
-                          scalar_t infinity,
-                          int limit
+                          scalar_t infinity
                         )
  {
      scalar_t minVal = 0;
-     int num_remaining = min(nc, 
-      limit
-      // prune_costs(nr, nc, cost)
-    );
+     int num_remaining = nc;
 
-     for (int it = 0; it < limit; ++it) {
+     for (int it = 0; it < num_remaining; ++it) {
          SC[it] = 0;
-         remaining[it] = limit - it - 1;
+         remaining[it] = num_remaining - it - 1;
          shortestPathCosts[it] = infinity;
      }
  
@@ -164,8 +160,7 @@ __device__
                         int *path, int *col4row, int *row4col,
                         uint8_t *SR, uint8_t *SC,
                         int *remaining,
-                        scalar_t infinity,
-                        int limit
+                        scalar_t infinity
                         )
  {
    scalar_t minVal;
@@ -176,8 +171,7 @@ __device__
                                       shortestPathCosts,
                                       SR, SC,
                                       remaining,
-                                      &minVal, infinity,
-                                      limit
+                                      &minVal, infinity
                                     );
   
      u[curRow] += minVal;
@@ -187,7 +181,7 @@ __device__
        }
      }
  
-     for (int j = 0; j < limit; j++) {
+     for (int j = 0; j < nc; j++) {
        if (SC[j]) {
          v[j] -= minVal - shortestPathCosts[j];
        }
@@ -197,7 +191,7 @@ __device__
      int j = sink;
      int swap;
 
-    int max_iterations = limit;  // Prevent infinite loops
+    int max_iterations = nc;  // Prevent infinite loops
     int iterations = 0;
 
     while (i != curRow && iterations++ < max_iterations) {
@@ -222,14 +216,12 @@ __device__
                               int *path, int *col4row, int *row4col,
                               uint8_t *SR, uint8_t *SC,
                               int *remaining,
-                              scalar_t infinity,
-                              int *limits
+                              scalar_t infinity
                             ) {
    int i = blockDim.x * blockIdx.x + threadIdx.x;
    if (i >= bs) {
      return;
    }
-   int limit = limits[i];
  
    solve_cuda_kernel(nr, nc,
                      cost + i * nr * nc,
@@ -242,35 +234,10 @@ __device__
                      SR + i * nr,
                      SC + i * nc,
                      remaining + i * nc,
-                     infinity,
-                     limit
+                     infinity
                     );
  }
  
-template <typename scalar_t>
-__global__
- void getLimits(int bs, int nr, int nc, scalar_t *costs, int *out){
-  int i = blockIdx.x * blockDim.x + threadIdx.x;
-  if (i >= bs) {return;}
-  scalar_t *cost = costs + i * nr * nc;
-  auto padVal = cost[nc * nr - 1];
-  for (int c = 0; c < nc; c++){
-    if (cost[c] != padVal){
-      continue; 
-    }
-    bool allPad = true;
-    for (int r = 0; r <nr; r++){
-        if (cost[r * nr + c] != padVal){
-            allPad = false;
-            break;
-        }
-    }
-    if (allPad){
-        out[i] = c;
-    }
-  }
-  out[i] = nc;
-} 
  
  template <typename scalar_t>
  void solve_cuda_batch(c10::ScalarType scalar_type,
@@ -303,10 +270,6 @@ __global__
    static const int blockSize = SMPCores(device_index);
    int gridSize = (bs + blockSize - 1) / blockSize;
    at::cuda::CUDAStream stream = at::cuda::getCurrentCUDAStream(device_index);
-   torch::Tensor limits = torch::ones({bs}, int_opt) * nc;
-   getLimits<<<gridSize, blockSize, 0, stream.stream()>>>(bs, nr, nc,
-    cost, limits.data<int>()
-   );
    solve_cuda_kernel_batch<<<gridSize, blockSize, 0, stream.stream()>>>(
      bs, nr, nc,
      cost,
@@ -318,8 +281,7 @@ __global__
      SR.data_ptr<uint8_t>(),
      SC.data<uint8_t>(),
      remaining.data_ptr<int>(),
-     infinity,
-     limits.data_ptr<int>()
+     infinity
     );
    cudaError_t err = cudaGetLastError();
    if (err != cudaSuccess) {

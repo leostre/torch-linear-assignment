@@ -20,34 +20,34 @@ typedef unsigned char uint8_t;
 // Optimized for modern GPUs (Ampere+)
 // constexpr int BLOCK_SIZE = 256;  // Better for half-precision operations
 
-// int SMPCoresf16(int device_index)
-//   {
-//     cudaDeviceProp devProp;
-//     cudaGetDeviceProperties(&devProp, device_index);
-//     switch (devProp.major){
-//     case 2: // Fermi
-//       if (devProp.minor == 1)
-//         return 48;
-//       else return 32;
-//     case 3: // Kepler
-//       return 192;
-//     case 5: // Maxwell
-//       return 128;
-//     case 6: // Pascal
-//       if ((devProp.minor == 1) || (devProp.minor == 2)) return 128;
-//       else if (devProp.minor == 0) return 64;
-//     case 7: // Volta and Turing
-//       if ((devProp.minor == 0) || (devProp.minor == 5)) return 64;
-//     case 8: // Ampere
-//       if (devProp.minor == 0) return 64;
-//       else if (devProp.minor == 6) return 128;
-//       else if (devProp.minor == 9) return 128; // ada lovelace
-//     case 9: // Hopper
-//       if (devProp.minor == 0) return 128;
-//     // Unknown device;
-//     }
-//     return 128;
-//   }
+int SMPCoresf16(int device_index)
+  {
+    cudaDeviceProp devProp;
+    cudaGetDeviceProperties(&devProp, device_index);
+    switch (devProp.major){
+    case 2: // Fermi
+      if (devProp.minor == 1)
+        return 48;
+      else return 32;
+    case 3: // Kepler
+      return 192;
+    case 5: // Maxwell
+      return 128;
+    case 6: // Pascal
+      if ((devProp.minor == 1) || (devProp.minor == 2)) return 128;
+      else if (devProp.minor == 0) return 64;
+    case 7: // Volta and Turing
+      if ((devProp.minor == 0) || (devProp.minor == 5)) return 64;
+    case 8: // Ampere
+      if (devProp.minor == 0) return 64;
+      else if (devProp.minor == 6) return 128;
+      else if (devProp.minor == 9) return 128; // ada lovelace
+    case 9: // Hopper
+      if (devProp.minor == 0) return 128;
+    // Unknown device;
+    }
+    return 128;
+  }
 
 
 template <typename uint8_t>
@@ -58,23 +58,23 @@ void array_fill(uint8_t* start, uint8_t* stop, uint8_t value) {
     }
 }
 
-__device__ __forceinline__
-int prune_costs_half(int nr, int nc, __half* cost) {
-    __half padVal = cost[nc - 1];
-    for (int c = 0; c < nc; c++) {
-        if (__hne(cost[c], padVal)) continue;
+// __device__ __forceinline__
+// int prune_costs_half(int nr, int nc, __half* cost) {
+//     __half padVal = cost[nc - 1];
+//     for (int c = 0; c < nc; c++) {
+//         if (__hne(cost[c], padVal)) continue;
         
-        bool allPad = true;
-        for (int r = 0; r < nr; r++) {
-            if (__hne(cost[r * nr + c], padVal)) {
-                allPad = false;
-                break;
-            }
-        }
-        if (allPad) return c;
-    }
-    return nc;
-}
+//         bool allPad = true;
+//         for (int r = 0; r < nr; r++) {
+//             if (__hne(cost[r * nr + c], padVal)) {
+//                 allPad = false;
+//                 break;
+//             }
+//         }
+//         if (allPad) return c;
+//     }
+//     return nc;
+// }
 
 __device__ __forceinline__
 int augmenting_path_half(int nr, int nc, int i,
@@ -84,16 +84,16 @@ int augmenting_path_half(int nr, int nc, int i,
                         uint8_t* SR, uint8_t* SC,
                         int* remaining,
                         __half* p_minVal,
-                        __half infinity,
-                        int limit) {
+                        __half infinity
+                        ) {
 
 
     __half minVal = __float2half(0.0f);
-    int num_remaining = min(nc, limit);
+    int num_remaining = nc;
 
-    for (int it = 0; it < limit; ++it) {
+    for (int it = 0; it < num_remaining; ++it) {
         SC[it] = 0;
-        remaining[it] = limit - it - 1;
+        remaining[it] = num_remaining - it - 1;
         shortestPathCosts[it] = infinity;
     }
 
@@ -155,8 +155,7 @@ void solve_kernel_half(int bs, int nr, int nc, // analogue of solve_cuda_kernel
                       int* path, int* col4row, int* row4col,
                       uint8_t* SR, uint8_t* SC,
                       int* remaining,
-                      __half infinity,
-                      int limit) {
+                      __half infinity) {
     __half minVal;    
     for (int curRow = 0; curRow < nr; ++curRow) {
         int sink = augmenting_path_half(nr, nc, curRow, 
@@ -170,8 +169,7 @@ void solve_kernel_half(int bs, int nr, int nc, // analogue of solve_cuda_kernel
                                       SC,
                                       remaining,
                                       &minVal,
-                                      infinity,
-                                      limit);
+                                      infinity);
 
 
     u[curRow] = __hadd(u[curRow], minVal);
@@ -183,7 +181,7 @@ void solve_kernel_half(int bs, int nr, int nc, // analogue of solve_cuda_kernel
             }
         }
 
-        for (int j = 0; j < limit; j++) {
+        for (int j = 0; j < nc; j++) {
             if (SC[j]) {
                 __half update = __hsub(minVal, shortestPathCosts[j]);
                 v[j] = __hsub(v[j], update);
@@ -192,7 +190,7 @@ void solve_kernel_half(int bs, int nr, int nc, // analogue of solve_cuda_kernel
         int i = -1;
         int j = sink;
         int swap;
-        int max_iterations = limit;
+        int max_iterations = nc;
         int iterations = 0;
 
 
@@ -217,14 +215,13 @@ void solve_kernel_half_batch(int bs, int nr, int nc,
                              int *path, int *col4row, int *row4col,
                              uint8_t *SR, uint8_t *SC,
                              int *remaining,
-                             __half infinity,
-                             int *limits
+                             __half infinity
                            ) {
   int i = blockDim.x * blockIdx.x + threadIdx.x;
   if (i >= bs) {
     return;
   }
-  int limit = limits[i];
+
   solve_kernel_half(bs, nr, nc,
     cost + i * nr * nc,
     u + i * nr,
@@ -236,8 +233,7 @@ void solve_kernel_half_batch(int bs, int nr, int nc,
     SR + i * nr,
     SC + i * nc,
     remaining + i * nc,
-    infinity,
-    limit
+    infinity
    );
 
 }
@@ -273,7 +269,6 @@ void solve_half_batch(torch::Tensor cost,
         
     torch::Tensor path = torch::full({bs * nc}, -1, int_options);
     torch::Tensor remaining = torch::empty({bs * nc}, int_options);
-    torch::Tensor limits = torch::full({bs}, nc, int_options);
 
     // Byte tensors
     auto byte_options = torch::TensorOptions()
@@ -284,7 +279,7 @@ void solve_half_batch(torch::Tensor cost,
     torch::Tensor SC = torch::empty({bs * nc}, byte_options);
 
     // Launch kernel
-    static const int blockSize = 1; //SMPCoresf16(device_index);
+    static const int blockSize = SMPCoresf16(device_index);
     int grid_size = (bs + blockSize - 1) / blockSize;
     solve_kernel_half_batch<<<grid_size, blockSize, 0, stream.stream()>>>(
         bs, nr, nc,
@@ -298,8 +293,7 @@ void solve_half_batch(torch::Tensor cost,
         SR.data_ptr<uint8_t>(),
         SC.data_ptr<uint8_t>(),
         remaining.data_ptr<int>(),
-        infinity,
-        limits.data_ptr<int>()
+        infinity
     );
 
     // Error checking
@@ -310,7 +304,7 @@ void solve_half_batch(torch::Tensor cost,
 }
  
 std::vector<torch::Tensor> bla_half(torch::Tensor cost) {
-     printf("FLOAT16");
+    //  printf("FLOAT16");
 
     auto sizes = cost.sizes();  
     auto device = cost.device();

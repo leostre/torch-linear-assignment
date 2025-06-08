@@ -70,7 +70,7 @@ for tp in TYPES:
             try:
                 rate, t = nr_nc_ratio(nr, nc, factor, type=TYPES[tp])
             except:
-                rate = t = -1
+                rate = t = -1e-5
 
             times.append(t)
             right_rate.append(rate)
