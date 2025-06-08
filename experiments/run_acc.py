@@ -1,4 +1,4 @@
-from utils import get_current_git_branch
+from utils import get_current_git_branch, set_all_seeds
 
 import os
 from time import time
@@ -11,6 +11,8 @@ import pandas as pd
 from tqdm import tqdm
 
 from torch_linear_assignment import batch_linear_assignment
+
+set_all_seeds()
 
 is_cuda = torch.cuda.is_available()
 assert is_cuda, 'Requires CUDA!'
@@ -28,23 +30,28 @@ _TYPES = {
     'f32': torch.float32
 }
 
-real_costs = torch.load('/root/torch-linear-assignment/data/train-end.pth')
+REAL_DATA = torch.load('/root/torch-linear-assignment/data/train-start.pth')
+ANS = torch.load('data/start-ans.pth')
 
-def nr_nc(bs, type):
+def real_data(bs, type):
     if is_cuda:
-        costs = real_costs[:bs].to('cuda').to(_TYPES[type])
+        costs = REAL_DATA[:bs].to('cuda').to(_TYPES[type])
     assert costs.dtype == _TYPES[type]
+    acc = 1
+
     try:
         torch.cuda.synchronize()
         t = time()
-        batch_linear_assignment(costs)
+        result = batch_linear_assignment(costs)
         t = time() - t
+        result_ref= ANS[:bs]
+        acc = (result == result_ref) / result.numel()       
     except:
-        return -1e-5
+        return -1e-5, acc
     finally:
         del costs 
-        torch.cuda.empty_cache()
-    return t
+        # torch.cuda.empty_cache()
+    return t, acc
 
 print('STARTED BS EVALUATION'.center(80, '+'))
 for TYPE in _TYPES:
@@ -54,15 +61,21 @@ for TYPE in _TYPES:
 
     for bs in tqdm(bss):
         times = [] 
+        accs = []
         for i in range(REPS):
-            t = nr_nc(bs, TYPE)
+            t, acc = real_data(bs, TYPE)
             times.append(t)
+            accs.append(acc)
         times = np.array(times)
+        accs = np.array(accs)
         results.append(
-            (bs, times.mean(), times.std())
+            (bs, times.mean(), times.std(), accs.mean(), accs.std())
         )
 
-    columns = ['bs', 'time_mean', 'time_std']
+    columns = ['bs', 'time_mean', 'time_std', 'accs_mean', 'accs_std']
     resdf = pd.DataFrame(data=results, columns=columns)
 
-    resdf.to_csv(f'experiments/results/bs_{EXP_NAME}_{TYPE}.csv')
+    resdf.to_csv(f'experiments/results/bs_acc_{EXP_NAME}_{TYPE}.csv')
+
+
+
