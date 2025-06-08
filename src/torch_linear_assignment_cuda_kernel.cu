@@ -19,34 +19,34 @@
  typedef unsigned char uint8_t;
  
  
-//  int SMPCores(int device_index)
-//  {
-//    cudaDeviceProp devProp;
-//    cudaGetDeviceProperties(&devProp, device_index);
-//    switch (devProp.major){
-//    case 2: // Fermi
-//      if (devProp.minor == 1)
-//        return 48;
-//      else return 32;
-//    case 3: // Kepler
-//      return 192;
-//    case 5: // Maxwell
-//      return 128;
-//    case 6: // Pascal
-//      if ((devProp.minor == 1) || (devProp.minor == 2)) return 128;
-//      else if (devProp.minor == 0) return 64;
-//    case 7: // Volta and Turing
-//      if ((devProp.minor == 0) || (devProp.minor == 5)) return 64;
-//    case 8: // Ampere
-//      if (devProp.minor == 0) return 64;
-//      else if (devProp.minor == 6) return 128;
-//      else if (devProp.minor == 9) return 128; // ada lovelace
-//    case 9: // Hopper
-//      if (devProp.minor == 0) return 128;
-//    // Unknown device;
-//    }
-//    return 128;
-//  }
+ int SMPCores(int device_index)
+ {
+   cudaDeviceProp devProp;
+   cudaGetDeviceProperties(&devProp, device_index);
+   switch (devProp.major){
+   case 2: // Fermi
+     if (devProp.minor == 1)
+       return 48;
+     else return 32;
+   case 3: // Kepler
+     return 192;
+   case 5: // Maxwell
+     return 128;
+   case 6: // Pascal
+     if ((devProp.minor == 1) || (devProp.minor == 2)) return 128;
+     else if (devProp.minor == 0) return 64;
+   case 7: // Volta and Turing
+     if ((devProp.minor == 0) || (devProp.minor == 5)) return 64;
+   case 8: // Ampere
+     if (devProp.minor == 0) return 64;
+     else if (devProp.minor == 6) return 128;
+     else if (devProp.minor == 9) return 128; // ada lovelace
+   case 9: // Hopper
+     if (devProp.minor == 0) return 128;
+   // Unknown device;
+   }
+   return 128;
+ }
  
  
  template <typename scalar_t>
@@ -244,7 +244,6 @@ __device__
                        int device_index,
                        int bs, int nr, int nc,
                        scalar_t *cost, int *col4row, int *row4col) {
-   printf("FLOAT32");
    cudaSetDevice(device_index);
  
    TORCH_CHECK(std::numeric_limits<scalar_t>::has_infinity, "Data type doesn't have infinity.");

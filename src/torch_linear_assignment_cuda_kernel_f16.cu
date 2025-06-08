@@ -310,6 +310,8 @@ void solve_half_batch(torch::Tensor cost,
 }
  
 std::vector<torch::Tensor> bla_half(torch::Tensor cost) {
+     printf("FLOAT16");
+
     auto sizes = cost.sizes();  
     auto device = cost.device();
     auto options = torch::TensorOptions()
