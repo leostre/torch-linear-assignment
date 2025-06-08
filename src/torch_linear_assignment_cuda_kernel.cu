@@ -229,8 +229,8 @@ void solve_cuda_batch(c10::ScalarType scalar_type,
   torch::Tensor SC = torch::empty({bs * nc}, uint8_opt);
   torch::Tensor remaining = torch::empty({bs * nc}, int_opt);
 
-  static const int blockSize = bs;// SMPCores(device_index);
-  int gridSize = 1; //(bs + blockSize - 1) / blockSize;
+  static const int blockSize = 1;// SMPCores(device_index);
+  int gridSize = bs; //(bs + blockSize - 1) / blockSize;
   at::cuda::CUDAStream stream = at::cuda::getCurrentCUDAStream(device_index);
   solve_cuda_kernel_batch<<<gridSize, blockSize, 0, stream.stream()>>>(
     bs, nr, nc,

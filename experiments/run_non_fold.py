@@ -52,12 +52,13 @@ print('STARTED BS EVALUATION'.center(80, '+'))
 for TYPE in _TYPES:
     results = []
     REPS = 20
-    bss = [4, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16364]
+    bss = (np.array([4, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16364]
+    ) * 0.9)
 
     for bs in tqdm(bss):
         times = [] 
         for i in range(REPS):
-            t = nr_nc(bs, TYPE)
+            t = nr_nc(int(bs), TYPE)
             times.append(t)
         times = np.array(times)
         results.append(
@@ -67,21 +68,4 @@ for TYPE in _TYPES:
     columns = ['bs', 'time_mean', 'time_std']
     resdf = pd.DataFrame(data=results, columns=columns)
 
-    resdf.to_csv(f'experiments/results/bs_{EXP_NAME}_{TYPE}.csv')
-
-
-def nr_nc(bs, type, acc=False):
-    if is_cuda:
-        costs = real_costs[:bs].to('cuda').to(_TYPES[type])
-    assert costs.dtype == _TYPES[type]
-    try:
-        torch.cuda.synchronize()
-        t = time()
-        batch_linear_assignment(costs)
-        t = time() - t
-    except:
-        return -1e-5
-    finally:
-        del costs 
-        torch.cuda.empty_cache()
-    return t
+    resdf.to_csv(f'experiments/results/bs_nonfold_{EXP_NAME}_{TYPE}.csv')
