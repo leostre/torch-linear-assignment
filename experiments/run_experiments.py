@@ -55,10 +55,9 @@ print('Started SCALE'.center(80, '+'))
 for tp in TYPES:
     results = []
     REPS = 10
-    factors = [1, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 
-            1e-7, 1e-8, 
-            #    1e-9, 1e-10,
-            #     1e4, 1e8
+    factors = [1, 1e-1, 1e-2, 1e-4, 1e-6, 
+            # 1e-7, 1e-8, 
+               1e2, 1e4, 1e8
     ]
     nrs = [4, 16, 64, 128]
     ncs = [4, 16, 64, 128]
