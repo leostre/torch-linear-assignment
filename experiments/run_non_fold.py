@@ -30,52 +30,43 @@ _TYPES = {
     'f32': torch.float32
 }
 
-REAL_DATA = torch.load('/root/torch-linear-assignment/data/train-start.pth')
-ANS = torch.load('data/start-ans.pth')
+real_costs = torch.load('/root/torch-linear-assignment/data/train-end.pth')
 
-def real_data(bs, type):
+def nr_nc(bs, type):
     if is_cuda:
-        costs = REAL_DATA[:bs].to('cuda').to(_TYPES[type])
+        costs = real_costs[:bs].to('cuda').to(_TYPES[type])
     assert costs.dtype == _TYPES[type]
-    acc = 1
-
     try:
         torch.cuda.synchronize()
         t = time()
-        result = batch_linear_assignment(costs)
+        batch_linear_assignment(costs)
         t = time() - t
-        result_ref= ANS[:bs]
-        acc = (result == result_ref) / result.numel()       
     except:
-        return -1e-5, acc
+        return -1e-5
     finally:
         del costs 
-        # torch.cuda.empty_cache()
-    return t, acc
+        torch.cuda.empty_cache()
+    return t
 
 print('STARTED BS EVALUATION'.center(80, '+'))
 for TYPE in _TYPES:
     results = []
-    REPS = 10
-    bss = [4, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16364]
+    REPS = 20
+    bss = (np.array([4, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16364]
+    ) * 0.9)
 
     for bs in tqdm(bss):
         times = [] 
-        accs = []
         for i in range(REPS):
-            t, acc = real_data(bs, TYPE)
+            t = nr_nc(int(bs), TYPE)
             times.append(t)
-            accs.append(acc)
         times = np.array(times)
-        accs = np.array(accs)
         results.append(
-            (bs, times.mean(), times.std(), accs.mean(), accs.std())
+            (bs, times.mean(), times.std())
         )
 
-    columns = ['bs', 'time_mean', 'time_std', 'accs_mean', 'accs_std']
+    columns = ['bs', 'time_mean', 'time_std']
     resdf = pd.DataFrame(data=results, columns=columns)
 
-    resdf.to_csv(f'experiments/results/bs_acc_{EXP_NAME}_{TYPE}.csv')
-
-
+    resdf.to_csv(f'experiments/results/bs_nonfold_{EXP_NAME}_{TYPE}.csv')
 
