@@ -28,7 +28,7 @@ def batch_linear_assignment_cuda(cost):
 
 
 
-def batch_linear_assignment(cost):
+def batch_linear_assignment(cost, factor=1):
     """Solve a batch of linear assignment problems.
 
     The method minimizes the cost.
@@ -43,6 +43,8 @@ def batch_linear_assignment(cost):
     """
     if cost.ndim != 3:
         raise ValueError("Need 3-dimensional tensor with shape (B, W, T).")
+    if factor != 1:
+        cost = cost * factor
     if backend.has_cuda() and cost.is_cuda:
         if cost.dtype in (torch.long, torch.int, torch.int16, torch.int8):
             cost = cost.to(torch.float32)
