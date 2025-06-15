@@ -54,7 +54,7 @@ print('Started SCALE'.center(80, '+'))
 
 for tp in TYPES:
     results = []
-    REPS = 10
+    REPS = 20
     factors = [1, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 
             1e-7, 1e-8, 
             #    1e-9, 1e-10,
@@ -110,7 +110,7 @@ def nr_nc_ratio_shift(nr, nc, shift=0, type=torch.float32):
 
 for tp in TYPES:
     results_shift = []
-    REPS = 10
+    REPS = 20
     shifts = [1, 1e2, 1e4,
             #    1e6, 
             #   1e8, 1e10
