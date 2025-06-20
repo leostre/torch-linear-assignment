@@ -15,20 +15,20 @@ def batch_linear_assignment_cpu(cost):
     return matching
 
 
-def batch_linear_assignment_cuda(cost):
+def batch_linear_assignment_cuda(cost, scale_factor=1):
     b, w, t = cost.shape
     # raise Exception(str(cost.dtype))
     if t < w:
         cost = cost.transpose(1, 2)  # (B, T, W).
-        col4row, row4col = backend.batch_linear_assignment(cost.contiguous())  # (B, T), (B, W).
+        col4row, row4col = backend.batch_linear_assignment(cost.contiguous(), scale_factor)  # (B, T), (B, W).
         return row4col.long()
     else:
-        col4row, row4col = backend.batch_linear_assignment(cost.contiguous())  # (B, W), (B, T).
+        col4row, row4col = backend.batch_linear_assignment(cost.contiguous(), scale_factor)  # (B, W), (B, T).
         return col4row.long()
 
 
 
-def batch_linear_assignment(cost):
+def batch_linear_assignment(cost, scale_factor=2):
     """Solve a batch of linear assignment problems.
 
     The method minimizes the cost.
@@ -46,7 +46,7 @@ def batch_linear_assignment(cost):
     if backend.has_cuda() and cost.is_cuda:
         if cost.dtype in (torch.long, torch.int, torch.int16, torch.int8):
             cost = cost.to(torch.float32)
-        return batch_linear_assignment_cuda(cost)
+        return batch_linear_assignment_cuda(cost, scale_factor)
     else:
         return batch_linear_assignment_cpu(cost)
 
