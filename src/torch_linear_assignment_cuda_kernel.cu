@@ -200,77 +200,13 @@ void solve_cuda_kernel_batch(int bs, int nr, int nc,
                     infinity);
 }
 
-// template <typename scalar_t>
-// __global__ void scale_matrix_kernel(
-//     int batchSize,
-//     int nrows,
-//     int cols,
-//     scalar_t* costs,
-//     int factor)
-// {
-//   int i = blockDim.x * blockIdx.x + threadIdx.x;
-//   if (i > bs * )
 
-template <typename scalar_t, int VEC_SIZE>
-__global__ void scale_matrix_kernel(
-    int batchSize,
-    int nrows,
-    int cols,
-    scalar_t* costs,
-    int factor)
-{
-    // Vector type selection based on VEC_SIZE
-    using VecType = typename std::conditional<
-        VEC_SIZE == 4, float4,
-        typename std::conditional<
-            VEC_SIZE == 2, float2,
-            scalar_t
-        >::type
-    >::type;
-
-    // Calculate batch index
-    int batch = blockIdx.z;
-    if (batch >= batchSize) return;
-
-    // Adjust columns for vectorized processing
-    int vec_cols = cols / VEC_SIZE;
-    int col_vec = blockIdx.x * blockDim.x + threadIdx.x;
-    int row = blockIdx.y * blockDim.y + threadIdx.y;
-
-    if (row >= nrows || col_vec >= vec_cols) return;
-
-    // Base pointer for this batch with vector type
-    VecType* batch_costs = reinterpret_cast<VecType*>(costs + batch * nrows * cols);
-    VecType* ptr = &batch_costs[row * vec_cols + col_vec];
-    
-    // Load vectorized data
-    VecType data = *ptr;
-
-    // Apply scaling factor
-    if constexpr (VEC_SIZE == 4) {
-        data.x *= factor;
-        data.y *= factor;
-        data.z *= factor;
-        data.w *= factor;
-    } 
-    else if constexpr (VEC_SIZE == 2) {
-        data.x *= factor;
-        data.y *= factor;
-    } 
-    else {
-        data *= factor;
-    }
-
-    // Store back
-    *ptr = data;
-}
 
 template <typename scalar_t>
 void solve_cuda_batch(c10::ScalarType scalar_type,
                       int device_index,
                       int bs, int nr, int nc,
-                      scalar_t *cost, int *col4row, int *row4col, 
-                      int scale_factor){
+                      scalar_t *cost, int *col4row, int *row4col) {
   cudaSetDevice(device_index);
 
   TORCH_CHECK(std::numeric_limits<scalar_t>::has_infinity, "Data type doesn't have infinity.");
@@ -285,34 +221,7 @@ void solve_cuda_batch(c10::ScalarType scalar_type,
   auto uint8_opt = torch::TensorOptions()
     .dtype(torch::kUInt8)
     .device(torch::kCUDA, device_index);
-  if (scale_factor != 1) {
-    dim3 blockSize(16, 16);
-    dim3 gridSize(
-        (nc + blockSize.x - 1) / blockSize.x,
-        (nr + blockSize.y - 1) / blockSize.y,
-        bs
-    );
-    
-    Dispatch based on scalar type to select appropriate vector size
-    if (scalar_type == at::kFloat) {
-      constexpr int VEC_SIZE = 4;  // Use float4 for float
-      scale_matrix_kernel<scalar_t, VEC_SIZE><<<gridSize, blockSize>>>(
-          bs, nr, nc, cost, scale_factor);
-    } else if (scalar_type == at::kDouble) {
-      constexpr int VEC_SIZE = 2;  // Use float2 for double (since CUDA doesn't have double4)
-      scale_matrix_kernel<scalar_t, VEC_SIZE><<<gridSize, blockSize>>>(
-          bs, nr, nc, cost, scale_factor);
-    } else {
-      constexpr int VEC_SIZE = 1;  // Fallback to scalar
-      scale_matrix_kernel<scalar_t, VEC_SIZE><<<gridSize, blockSize>>>(
-          bs, nr, nc, cost, scale_factor);
-    }
-    // constexpr int VEC_SIZE = 1;  // Fallback to scalar
-    //   scale_matrix_kernel<scalar_t, VEC_SIZE><<<gridSize, blockSize>>>(
-    //       bs, nr, nc, cost, scale_factor);
-    cudaDeviceSynchronize();
-  }
-  
+
   torch::Tensor u = torch::zeros({bs * nr}, scalar_t_opt);
   torch::Tensor v = torch::zeros({bs * nc}, scalar_t_opt);
   torch::Tensor shortestPathCosts = torch::empty({bs * nc}, scalar_t_opt);
@@ -342,7 +251,8 @@ void solve_cuda_batch(c10::ScalarType scalar_type,
   }
 }
 
-std::vector<torch::Tensor> batch_linear_assignment_cuda(torch::Tensor cost, int scale_factor = 1) {
+
+std::vector<torch::Tensor> batch_linear_assignment_cuda(torch::Tensor cost) {
   auto sizes = cost.sizes();
 
   TORCH_CHECK(sizes[2] >= sizes[1], "The number of tasks must be greater or equal to the number of workers.");
@@ -366,8 +276,7 @@ std::vector<torch::Tensor> batch_linear_assignment_cuda(torch::Tensor cost, int 
         sizes[0], sizes[1], sizes[2],
         cost.data<scalar_t>(),
         col4row.data<int>(),
-        row4col.data<int>(),
-        scale_factor);
+        row4col.data<int>());
   });
   return {col4row, row4col};
 }
