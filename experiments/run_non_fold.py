@@ -69,4 +69,3 @@ for TYPE in _TYPES:
     resdf = pd.DataFrame(data=results, columns=columns)
 
     resdf.to_csv(f'experiments/results/bs_nonfold_{EXP_NAME}_{TYPE}.csv')
-
