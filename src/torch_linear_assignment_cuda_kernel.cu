@@ -200,6 +200,17 @@ void solve_cuda_kernel_batch(int bs, int nr, int nc,
                     infinity);
 }
 
+// template <typename scalar_t>
+// __global__ void scale_matrix_kernel(
+//     int batchSize,
+//     int nrows,
+//     int cols,
+//     scalar_t* costs,
+//     int factor)
+// {
+//   int i = blockDim.x * blockIdx.x + threadIdx.x;
+//   if (i > bs * )
+
 template <typename scalar_t, int VEC_SIZE>
 __global__ void scale_matrix_kernel(
     int batchSize,
@@ -282,7 +293,7 @@ void solve_cuda_batch(c10::ScalarType scalar_type,
         bs
     );
     
-    // Dispatch based on scalar type to select appropriate vector size
+    Dispatch based on scalar type to select appropriate vector size
     if (scalar_type == at::kFloat) {
       constexpr int VEC_SIZE = 4;  // Use float4 for float
       scale_matrix_kernel<scalar_t, VEC_SIZE><<<gridSize, blockSize>>>(
@@ -296,6 +307,9 @@ void solve_cuda_batch(c10::ScalarType scalar_type,
       scale_matrix_kernel<scalar_t, VEC_SIZE><<<gridSize, blockSize>>>(
           bs, nr, nc, cost, scale_factor);
     }
+    // constexpr int VEC_SIZE = 1;  // Fallback to scalar
+    //   scale_matrix_kernel<scalar_t, VEC_SIZE><<<gridSize, blockSize>>>(
+    //       bs, nr, nc, cost, scale_factor);
     cudaDeviceSynchronize();
   }
   
@@ -330,7 +344,6 @@ void solve_cuda_batch(c10::ScalarType scalar_type,
 
 std::vector<torch::Tensor> batch_linear_assignment_cuda(torch::Tensor cost, int scale_factor = 1) {
   auto sizes = cost.sizes();
-
 
   TORCH_CHECK(sizes[2] >= sizes[1], "The number of tasks must be greater or equal to the number of workers.");
 
