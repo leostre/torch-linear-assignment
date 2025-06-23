@@ -19,23 +19,30 @@ def batch_linear_assignment_cuda(cost):
     b, w, t = cost.shape
     # raise Exception(str(cost.dtype))
     if t < w:
+        cost = cost.transpose(1, 2)
+    if cost.dtype not in (torch.float16, torch.bfloat16):
+        result = backend.batch_linear_assignment(cost.contiguous().float())
+    else:
+        
+        result = backend.batch_linear_assignment_half(cost.contiguous())
+    ret = (result[-1] if t < w else result[0]).long()
+    return ret
+
+    if t < w:
         cost = cost.transpose(1, 2)  # (B, T, W).
-        if cost.dtype is not torch.float16:
+        if cost.dtype not in (torch.float16, torch.bfloat16):
             col4row, row4col = backend.batch_linear_assignment(cost.contiguous().float())  # (B, T), (B, W).
             return row4col.long()
         else: 
             col4row, row4col = backend.batch_linear_assignment_half(cost.contiguous())  # (B, T), (B, W).
             return row4col.long()
     else:
-        if cost.dtype is not torch.float16:
+        if cost.dtype not  in (torch.float16, torch.bfloat16):
             col4row, row4col = backend.batch_linear_assignment(cost.contiguous().float())  # (B, W), (B, T).
             return col4row.long()
         else: 
             col4row, row4col = backend.batch_linear_assignment_half(cost.contiguous())  # (B, W), (B, T).
             return col4row.long()
-
-
-
 
 
 def batch_linear_assignment(cost, factor=1):
@@ -53,6 +60,7 @@ def batch_linear_assignment(cost, factor=1):
     """
     if cost.ndim != 3:
         raise ValueError("Need 3-dimensional tensor with shape (B, W, T).")
+    cost = (cost - torch.mean(cost, dim=(-2, -1), keepdim=True, dtype=torch.float32)) / torch.std(cost, dim=(-2, -1), keepdim=True, dtype=torch.float32)
     if factor != 1:
         cost = cost * factor
     if backend.has_cuda() and cost.is_cuda:
