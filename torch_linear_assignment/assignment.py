@@ -19,14 +19,15 @@ def batch_linear_assignment_cuda(cost):
     b, w, t = cost.shape
     # raise Exception(str(cost.dtype))
     if t < w:
-        cost = cost.transpose(1, 2)  # (B, T, W).
-        col4row, row4col = backend.batch_linear_assignment(cost.contiguous())  # (B, T), (B, W).
-        return row4col.long()
+        cost = cost.transpose(1, 2)
+    if cost.dtype not in (torch.float16, torch.bfloat16):
+        result = backend.batch_linear_assignment(cost.contiguous().float())
+    elif cost.dtype is torch.bfloat16:
+        result = backend.tla_bf16(cost.contiguous())
     else:
-        col4row, row4col = backend.batch_linear_assignment(cost.contiguous())  # (B, W), (B, T).
-        return col4row.long()
-
-
+        result = backend.batch_linear_assignment_half(cost.contiguous())
+    ret = (result[-1] if t < w else result[0]).long()
+    return ret
 
 def batch_linear_assignment(cost):
     """Solve a batch of linear assignment problems.
