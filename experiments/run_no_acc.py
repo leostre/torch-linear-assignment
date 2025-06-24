@@ -27,6 +27,7 @@ EXP_NAME = get_current_git_branch()
 # TYPE = 'f16'
 _TYPES = {
     'f16': torch.float16,
+    'bf16': torch.bfloat16,
     'f32': torch.float32
 }
 
