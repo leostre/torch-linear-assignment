@@ -15,20 +15,38 @@ def batch_linear_assignment_cpu(cost):
     return matching
 
 
-def batch_linear_assignment_cuda(cost):
+def batch_linear_assignment_cuda(cost, dtype=None, scale_factor=1):
+    if dtype is None:
+        dtype = cost.dtype
     b, w, t = cost.shape
     # raise Exception(str(cost.dtype))
     if t < w:
-        cost = cost.transpose(1, 2)  # (B, T, W).
-        col4row, row4col = backend.batch_linear_assignment(cost.contiguous())  # (B, T), (B, W).
-        return row4col.long()
+        cost = cost.transpose(1, 2)
+    if dtype in (torch.float16, torch.bfloat16):
+        cost = _whiten_data(cost, scale_factor=scale_factor).to(dtype)
+    if dtype not in (torch.float16, torch.bfloat16):
+        result = backend.batch_linear_assignment(cost.contiguous().float())
+    elif dtype is torch.bfloat16:
+        result = backend.bla_bf16(cost.contiguous())
     else:
-        col4row, row4col = backend.batch_linear_assignment(cost.contiguous())  # (B, W), (B, T).
-        return col4row.long()
+        result = backend.batch_linear_assignment_half(cost.contiguous())
+    ret = (result[-1] if t < w else result[0]).long()
+    return ret
+    
+from torch.nn.functional import tanh  
+def _whiten_data(costs, **kws):
+    costs -= torch.mean(costs, dim=(1, 2), keepdim=True)
+    costs /= torch.std(costs, dim=(1, 2), keepdim=True)
+    if 'tanh_range' in kws:
+        costs = tanh(kws['tanh_range'] * costs) * costs
+    if 'scale_factor' in kws:
+        scale_factor = kws['scale_factor']
+        if scale_factor != 1:
+            costs = costs * scale_factor
+    return costs
 
 
-
-def batch_linear_assignment(cost, factor=1):
+def batch_linear_assignment(cost, dtype=None, factor=1):
     """Solve a batch of linear assignment problems.
 
     The method minimizes the cost.
@@ -43,12 +61,11 @@ def batch_linear_assignment(cost, factor=1):
     """
     if cost.ndim != 3:
         raise ValueError("Need 3-dimensional tensor with shape (B, W, T).")
-    if factor != 1:
-        cost = cost * factor
+
     if backend.has_cuda() and cost.is_cuda:
         if cost.dtype in (torch.long, torch.int, torch.int16, torch.int8):
             cost = cost.to(torch.float32)
-        return batch_linear_assignment_cuda(cost)
+        return batch_linear_assignment_cuda(cost, dtype, scale_factor=factor)
     else:
         return batch_linear_assignment_cpu(cost)
 
