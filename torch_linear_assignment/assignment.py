@@ -19,14 +19,13 @@ def batch_linear_assignment_cuda(cost, dtype=None, scale_factor=1, clamp_factor=
     if dtype is None:
         dtype = cost.dtype
     b, w, t = cost.shape
-    # raise Exception(str(cost.dtype))
     if t < w:
         cost = cost.transpose(1, 2)
     if dtype in (torch.float16, torch.bfloat16):
         cost = _whiten_data(cost, scale_factor=scale_factor).to(dtype)
-    noise_scale = kws.get('noise_scale', 0)
-    if noise_scale > 0:
-        _dither_data(cost, noise_scale, kws.get('noise_type', 'uniform'))    
+    noise_type = kws.get('noise_type', None)
+    if noise_type:
+        _dither_data(cost, kws.get('noise_scale', 0), noise_type)    
     limit = clamp_factor * torch.finfo(dtype).max * clamp_factor
     torch.clamp_(cost, -limit, limit)
     if dtype not in (torch.float16, torch.bfloat16):

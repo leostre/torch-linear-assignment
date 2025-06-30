@@ -65,6 +65,29 @@ def run(bss, output_file, reps=10):
             print(*bs, np.mean(results), np.std(results), sep=',', file=file)
 
 
+def mae(pred, targ):
+    return torch.mean(torch.abs(pred - targ))
+
+def rmse(pred, targ):
+    return torch.sqrt(torch.mean(torch.square(pred- targ)))
+
+def smape(pred, targ):
+    return 200 * torch.mean(torch.abs(pred - targ) / (torch.abs(pred) + torch.abs(targ)))
+
+
+def sum_error(X: torch.Tensor, ans_indices: torch.Tensor, res_indices: torch.Tensor):
+    worker_idx = torch.arange(X.size(1))
+    s = torch.zeros(X.size(0))
+    for i, (cost, res_ind) in enumerate(zip(X, res_indices)):
+        s[i] = cost[worker_idx, res_ind].sum()
+
+    sans = torch.zeros(X.size(0))
+    for i, (cost, res_ind) in enumerate(zip(X, ans_indices)):
+        sans[i] = cost[worker_idx, res_ind].sum()
+    return (s - sans).numpy(), mae(s, sans).item(), rmse(s, sans).item(), smape(s, sans).item()
+
+
+
 import subprocess
 
 def get_current_git_branch():
@@ -104,3 +127,5 @@ if __name__ == "__main__":
         print(f"Current branch: {branch}")
     else:
         print("Not in a Git repository or in detached HEAD state")
+
+
