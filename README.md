@@ -10,7 +10,11 @@
         <a href="#Citation">Citation</a>
     <p>
 </h4>
+
+**\[DISCLAIMER\]**: this experimental repository aimed to provide some approaches for quantized computations and algorithm acceleration. To view details, **explore branches**.
+<br><br>
 Batch computation of the linear assignment problem on GPU.
+
 
 ## Install
 Build and install via PyPI (source distribution):
