@@ -48,14 +48,13 @@ def nr_nc(bs, type):
         torch.cuda.empty_cache()
     return t
 
-print('STARTED BS EVALUATION'.center(80, '+'))
-for TYPE in _TYPES:
-    results = []
-    REPS = 20
-    bss = (np.array([4, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16364]
-    ) * 0.9)
+REPS = 20
+BSS = (np.array([4, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16364]
+) * 0.9)
 
-    for bs in tqdm(bss):
+def run(tp):
+    results = []
+    for bs in tqdm(BSS):
         times = [] 
         for i in range(REPS):
             t = nr_nc(int(bs), TYPE)
@@ -69,4 +68,9 @@ for TYPE in _TYPES:
     resdf = pd.DataFrame(data=results, columns=columns)
 
     resdf.to_csv(f'experiments/results/bs_nonfold_{EXP_NAME}_{TYPE}.csv')
+
+print('STARTED BS EVALUATION'.center(80, '+'))
+for TYPE in _TYPES:
+    run(tp)
+    
 
